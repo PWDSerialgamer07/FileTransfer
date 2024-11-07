@@ -2,7 +2,7 @@ import socket
 import threading
 import os
 import netifaces as ni
-import curses
+# import curses
 
 BROADCAST_PORT = 5000
 FILE_TRANSFER_PORT = 5001
@@ -23,3 +23,17 @@ def get_local_ip():
     finally:
         s.close()
     return local_ip
+
+
+def discover_devices():
+    local_ip = get_local_ip()
+    devices = []
+
+
+k = discover_devices()
+print(k)
+
+
+def server():
+    # TODO logic to send discovery message if received
+    pass
