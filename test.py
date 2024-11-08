@@ -1,4 +1,3 @@
-#this is testing for the discovery logic
 import socket
 import threading
 import time
@@ -7,6 +6,16 @@ import time
 DISCOVERY_PORT = 5000
 DISCOVERY_MESSAGE = b'DISCOVERY'
 RESPONSE_MESSAGE = b'RESPONSE'
+
+
+def get_local_ip():
+    """Returns the local IP address of the device on the LAN."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+
+
+LOCAL_IP = get_local_ip()  # Store the local IP to avoid self-discovery
 
 
 def discover_devices():
@@ -21,7 +30,7 @@ def discover_devices():
         while True:
             try:
                 data, addr = s.recvfrom(1024)
-                if data == RESPONSE_MESSAGE:
+                if data == RESPONSE_MESSAGE and addr[0] != LOCAL_IP:
                     print(f"Found device at {addr[0]}")
             except socket.timeout:
                 break
@@ -33,7 +42,7 @@ def listen_for_discovery():
         s.bind(('', DISCOVERY_PORT))
         while True:
             data, addr = s.recvfrom(1024)
-            if data == DISCOVERY_MESSAGE:
+            if data == DISCOVERY_MESSAGE and addr[0] != LOCAL_IP:
                 print(f"Discovery request received from {addr[0]}")
                 s.sendto(RESPONSE_MESSAGE, addr)
 
@@ -52,4 +61,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print(f"Local IP is {LOCAL_IP}")
     main()
