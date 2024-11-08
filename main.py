@@ -92,3 +92,7 @@ def main():
             broadcast_handshake(BROADCAST_IP)
         print(f"Broadcasted handshake to {BROADCAST_IP}")
         time.sleep(5)
+
+
+if __main__ == "__main__":
+    main()
