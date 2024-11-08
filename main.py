@@ -69,6 +69,7 @@ def discover_devices():
         local_ip = get_local_ip()  # Get the local IP
 
         print("Sending discovery message...")
+        # This sends to all devices on the network, which is very useful and I wish I knew it before spending hours searching
         s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
 
         while True:
