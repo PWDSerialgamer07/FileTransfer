@@ -63,4 +63,8 @@ def main():
     while True:
         broadcast_handshake()
         print(f"Broadcasted handshake to {BROADCAST_IP}")
-        time.sleep(1)
+        time.sleep(5)
+
+
+if __name__ == '__main__':
+    main()
