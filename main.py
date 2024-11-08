@@ -2,7 +2,8 @@ import socket
 import threading
 import time
 
-BROADCAST_PORT = 5000
+DISCOVERY_PORT = 5000
+HANDSHAKE_PORT = 5001
 DISCOVERY_MESSAGE = b'DISCOVERY'
 BROADCAST_IP = '192.168.1.255'
 TIMEOUT = 30  # In seconds
@@ -28,14 +29,15 @@ def broadcast_handshake(IP=BROADCAST_IP):
     # Same as before, broadcasts discovery message to the given IP
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
         bs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        bs.sendto(DISCOVERY_MESSAGE, (IP, BROADCAST_PORT))
+        bs.sendto(DISCOVERY_MESSAGE, (IP, HANDSHAKE_PORT))
+        print(f"Sending handshake to {IP}")
 
 
 def receive_handshake():
     # Handles receiving handshakes
     local_ip = get_local_ip()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
-        bs.bind(('', BROADCAST_PORT))
+        bs.bind(('', HANDSHAKE_PORT))
         while True:
             try:
                 data, addr = bs.recvfrom(1024)
@@ -44,6 +46,7 @@ def receive_handshake():
                 print(f"Received handshake from {addr[0]}")
                 if addr[0] not in devices and data == DISCOVERY_MESSAGE:
                     broadcast_handshake(addr[0])  # Respond back to the device
+                    print(f"Responded to {addr[0]}")
                     devices.append(addr[0])
             except socket.timeout:
                 break
@@ -56,20 +59,22 @@ def discover_devices():
         found_devices = []
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.bind(('0.0.0.0', 5001))
             s.settimeout(TIMEOUT)
 
             print(f"Sending discovery message from {local_ip}...")
-            s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
+            s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', DISCOVERY_MESSAGE))
 
             while True:
                 try:
                     data, addr = s.recvfrom(1024)
                     if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
+                        # This looks like it's overlapping with receive_handshake
                         print(f"Found device at {addr[0]}")
                         found_devices.append({'ip': addr[0]})
                 except socket.timeout:
                     break
-            time.sleep(5)  # Adjust this as needed to send periodically
+            time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
 
 def main():
