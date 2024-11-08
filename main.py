@@ -3,7 +3,6 @@ import threading
 import time
 
 BROADCAST_PORT = 5000
-FILE_TRANSFER_PORT = 5001
 DISCOVERY_MESSAGE = b'DISCOVERY'
 BROADCAST_IP = '192.168.1.255'
 TIMEOUT = 30  # In seconds
@@ -12,6 +11,7 @@ devices = []
 
 
 def get_local_ip():
+    # Same as before, returns the local IP of the machine
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(('8.8.8.8', 80))
@@ -24,55 +24,66 @@ def get_local_ip():
     return local_ip
 
 
-def discover_devices():
-    """Sends a discovery message and waits for responses."""
+def broadcast_handshake(IP=BROADCAST_IP):
+    # Same as before, broadcasts discovery message to the given IP
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
+        bs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        bs.sendto(DISCOVERY_MESSAGE, (IP, BROADCAST_PORT))
+
+
+def receive_handshake():
+    # Handles receiving handshakes
     local_ip = get_local_ip()
-    found_devices = []
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        s.settimeout(TIMEOUT)
-
-        print("Sending discovery message...")
-        s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
-
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
+        bs.bind(('', BROADCAST_PORT))
         while True:
             try:
-                data, addr = s.recvfrom(1024)
-                if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
-                    print(f"Found device at {addr[0]}")
-                    found_devices.append({'ip': addr[0]})
+                data, addr = bs.recvfrom(1024)
+                if addr[0] == local_ip or addr[0] == BLOCKED_IP or addr[0] in devices:
+                    continue
+                print(f"Received handshake from {addr[0]}")
+                if addr[0] not in devices and data == DISCOVERY_MESSAGE:
+                    broadcast_handshake(addr[0])  # Respond back to the device
+                    devices.append(addr[0])
             except socket.timeout:
                 break
 
-    return found_devices
+
+def discover_devices():
+    """ Continuously sends a discovery message and waits for responses. """
+    local_ip = get_local_ip()
+    while True:
+        found_devices = []
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            s.settimeout(TIMEOUT)
+
+            print(f"Sending discovery message from {local_ip}...")
+            s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
+
+            while True:
+                try:
+                    data, addr = s.recvfrom(1024)
+                    if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
+                        print(f"Found device at {addr[0]}")
+                        found_devices.append({'ip': addr[0]})
+                except socket.timeout:
+                    break
+            time.sleep(5)  # Adjust this as needed to send periodically
 
 
 def main():
-    clients = discover_devices()
-    handshaked_devices = set()  # Keep track of devices that we've already handshaked with
-    last_broadcast_time = time.time()
+    # Start the discovery thread to continuously send messages
+    discover_thread = threading.Thread(target=discover_devices, daemon=True)
+    discover_thread.start()
+
+    # Start the handshake receiving thread
+    receive_thread = threading.Thread(target=receive_handshake, daemon=True)
+    receive_thread.start()
 
     while True:
-        # Only broadcast every 10 seconds
-        if time.time() - last_broadcast_time >= 10:
-            for client in clients:
-                ip = client['ip']
-
-                # Skip devices we've already handshaked with
-                if ip in handshaked_devices:
-                    continue
-
-                # Send the broadcast to devices we haven't handshaked with
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
-                    bs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-                    bs.sendto(DISCOVERY_MESSAGE, (ip, BROADCAST_PORT))
-
-                handshaked_devices.add(ip)  # Mark this device as handshaked
-
-            print(f"Broadcasted handshake to new devices.")
-            last_broadcast_time = time.time()
-
-        time.sleep(1)  # Sleep for 1 second to avoid busy waiting
+        # Main loop logic can go here
+        time.sleep(1)
 
 
 if __name__ == "__main__":
