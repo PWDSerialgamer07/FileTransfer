@@ -13,6 +13,8 @@ FILE_TRANSFER_PORT = 5001
 DISCOVERY_MESSAGE = b'DISCOVERY'
 BROADCAST_IP = '192.168.1.255'
 TIMEOUT = 30  # In seconds
+# IP to explicitly block because I have no idea how to auto block it
+BLOCKED_IP = "25.34.22.246"
 devices = []
 
 
@@ -42,6 +44,7 @@ def broadcast_handshake(IP=BROADCAST_IP):
 
 
 def receive_handshake():
+    local_ip = get_local_ip()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
         # bs.settimeout(TIMEOUT)
         bs.bind(('', BROADCAST_PORT))  # Bind to the port for receiving data
@@ -49,7 +52,7 @@ def receive_handshake():
             try:
                 data, addr = bs.recvfrom(1024)  # Receive data from any device
                 print(f"Received handshake from {addr}")
-                if addr not in devices:
+                if addr not in devices and data == DISCOVERY_MESSAGE and addr != local_ip and addr != BLOCKED_IP:
                     broadcast_handshake(addr)  # Return discovery message
                     devices.append(addr)
             except socket.timeout:
@@ -58,26 +61,24 @@ def receive_handshake():
 
 
 def discover_devices():
-    target_ip = "192.168.1.1/24"
-    # IP Address for the destiation
+    """Sends discovery message over UDP broadcast to find devices on LAN."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.settimeout(TIMEOUT)  # Time to wait for responses
 
-    # create ARP packet
-    arp = ARP(pdst=target_ip)
+        local_ip = get_local_ip()  # Get the local IP
 
-    # create the Ether broadcast packet
-    # ff:ff:ff:ff:ff:ff MAC address indicates broadcasting
-    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
-    # stack them
-    packet = ether/arp
-    result = srp(packet, timeout=3)[0]
+        print("Sending discovery message...")
+        s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
 
-    # a list of clients, we will fill this in the upcoming loop
-    clients = []
-
-    for sent, received in result:
-        # for each response, append ip and mac address to `clients` list
-        clients.append({'ip': received.psrc, 'mac': received.hwsrc})
-    return clients
+        while True:
+            try:
+                data, addr = s.recvfrom(1024)
+                # Ignore responses from self or blocked IP
+                if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
+                    print(f"Found device at {addr[0]}")
+            except socket.timeout:
+                break
 
 
 def main():
@@ -87,10 +88,6 @@ def main():
     while True:
         for client in clients:
             ip = client['ip']
-            broadcast_handshake(ip)
+            broadcast_handshake(BROADCAST_IP)
         print(f"Broadcasted handshake to {BROADCAST_IP}")
         time.sleep(5)
-
-
-if __name__ == '__main__':
-    main()
