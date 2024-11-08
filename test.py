@@ -1,7 +1,6 @@
 import socket
 import threading
 import time
-import re
 
 # Discovery settings
 DISCOVERY_PORT = 5000
@@ -9,18 +8,14 @@ DISCOVERY_MESSAGE = b'DISCOVERY'
 RESPONSE_MESSAGE = b'RESPONSE'
 
 
-def get_lan_ip():
-    """Attempts to retrieve the local IP on the LAN (ignoring VPN adapters)."""
-    hostname, _, ips = socket.gethostbyname_ex(socket.gethostname())
-    # Option 1: Automatically pick IP based on LAN IP pattern, like 192.168.x.x or 10.x.x.x
-    for ip in ips:
-        if re.match(r"^(192\.168|10\.)", ip):  # Adjust pattern if needed
-            return ip
-    # Option 2: Fallback if no match found, just pick the first
-    return ips[0] if ips else "127.0.0.1"
+def get_local_ip():
+    """Returns the local IP address of the device on the LAN."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
 
 
-LOCAL_IP = get_lan_ip()  # Store the selected local IP to avoid self-discovery
+LOCAL_IP = get_local_ip()  # Store the local IP to avoid self-discovery
 
 
 def discover_devices():
@@ -55,7 +50,6 @@ def listen_for_discovery():
 
 
 def main():
-    print(f"Detected local IP for LAN: {LOCAL_IP}")
     listener_thread = threading.Thread(
         target=listen_for_discovery, daemon=True)
     listener_thread.start()
@@ -67,4 +61,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print(f"Local IP is {LOCAL_IP}")
     main()
