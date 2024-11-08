@@ -26,14 +26,22 @@ def get_local_ip():
 
 
 def discover_devices():
-    local_ip = get_local_ip()
+    # local_ip = get_local_ip()
     devices = []
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as bs: # BS for broadcast socket
+        bs.bind('',BROADCAST_PORT) # Might e possible with broadcast ip
 
 
-k = discover_devices()
+
+k = get_local_ip()
 print(k)
 
 
 def server():
     # TODO logic to send discovery message if received
+    # local_ip = get_local_ip()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as ls: # ls for listening socket
+        ls.bind('',FILE_TRANSFER_PORT)
+        ls.listen()
+        conn, addr = ls.accept()
     pass
