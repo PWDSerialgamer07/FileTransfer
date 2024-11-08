@@ -53,7 +53,7 @@ def receive_handshake():
                 data, addr = bs.recvfrom(1024)  # Receive data from any device
                 print(f"Received handshake from {addr}")
                 if addr not in devices and data == DISCOVERY_MESSAGE and addr != local_ip and addr != BLOCKED_IP:
-                    broadcast_handshake(addr)  # Return discovery message
+                    broadcast_handshake(addr[0])  # Return discovery message
                     devices.append(addr)
             except socket.timeout:
                 # Timeout (so you don't keep broadcasting forever)
@@ -61,25 +61,26 @@ def receive_handshake():
 
 
 def discover_devices():
-    """Sends discovery message over UDP broadcast to find devices on LAN."""
+    """Sends a discovery message and waits for responses."""
+    local_ip = get_local_ip()
+    found_devices = []
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        s.settimeout(TIMEOUT)  # Time to wait for responses
-
-        local_ip = get_local_ip()  # Get the local IP
+        s.settimeout(TIMEOUT)
 
         print("Sending discovery message...")
-        # This sends to all devices on the network, which is very useful and I wish I knew it before spending hours searching
         s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', BROADCAST_PORT))
 
         while True:
             try:
                 data, addr = s.recvfrom(1024)
-                # Ignore responses from self or blocked IP
                 if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
                     print(f"Found device at {addr[0]}")
+                    found_devices.append({'ip': addr[0]})
             except socket.timeout:
                 break
+
+    return found_devices
 
 
 def main():
