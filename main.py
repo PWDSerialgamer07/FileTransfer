@@ -51,8 +51,10 @@ def receive_handshake():
         while True:
             try:
                 data, addr = bs.recvfrom(1024)  # Receive data from any device
+                if addr[0] == local_ip or addr[0] == BLOCKED_IP:
+                    continue
                 print(f"Received handshake from {addr}")
-                if addr not in devices and data == DISCOVERY_MESSAGE and addr != local_ip and addr != BLOCKED_IP:
+                if addr[0] not in devices and data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
                     broadcast_handshake(addr[0])  # Return discovery message
                     devices.append(addr)
             except socket.timeout:
