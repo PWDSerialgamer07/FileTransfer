@@ -43,7 +43,7 @@ def broadcast_handshake(IP=BROADCAST_IP):
 
 def receive_handshake():
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
-        bs.settimeout(TIMEOUT)
+        # bs.settimeout(TIMEOUT)
         bs.bind(('', BROADCAST_PORT))  # Bind to the port for receiving data
         while True:
             try:
@@ -57,11 +57,37 @@ def receive_handshake():
                 break
 
 
+def discover_devices():
+    target_ip = "192.168.1.1/24"
+    # IP Address for the destiation
+
+    # create ARP packet
+    arp = ARP(pdst=target_ip)
+
+    # create the Ether broadcast packet
+    # ff:ff:ff:ff:ff:ff MAC address indicates broadcasting
+    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
+    # stack them
+    packet = ether/arp
+    result = srp(packet, timeout=3)[0]
+
+    # a list of clients, we will fill this in the upcoming loop
+    clients = []
+
+    for sent, received in result:
+        # for each response, append ip and mac address to `clients` list
+        clients.append({'ip': received.psrc, 'mac': received.hwsrc})
+    return clients
+
+
 def main():
     receive_thread = threading.Thread(target=receive_handshake)
     receive_thread.start()
+    clients = discover_devices()
     while True:
-        broadcast_handshake()
+        for client in clients:
+            ip = client['ip']
+            broadcast_handshake(ip)
         print(f"Broadcasted handshake to {BROADCAST_IP}")
         time.sleep(5)
 
