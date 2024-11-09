@@ -68,15 +68,14 @@ def discover_devices():
             print(f"Sending discovery message from {local_ip}...")
             s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', DISCOVERY_PORT))
 
-            while True:
-                try:
-                    data, addr = s.recvfrom(1024)
-                    if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
-                        print(f"Found device at {addr[0]}, responding")
-                        s.sendto(DISCOVERY_MESSAGE, addr[0])
-                        found_devices.append({'ip': addr[0]})
-                except socket.timeout:
-                    break
+            try:
+                data, addr = s.recvfrom(1024)
+                if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
+                    print(f"Found device at {addr[0]}, responding")
+                    s.sendto(DISCOVERY_MESSAGE, (addr[0], DISCOVERY_PORT))
+                    found_devices.append({'ip': addr[0]})
+            except socket.timeout:
+                break
             time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
 
