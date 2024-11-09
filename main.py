@@ -28,19 +28,20 @@ def get_local_ip():
 
 
 def broadcast_handshake():
-    # Broadcasts handshake message to the given IPs
-    with devices_lock:
-        IPs = [device['ip'] for device in found_devices]
-    # bh for broadcast handshake
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bh:
-        bh.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        if not IPs:  # If no IPs are provided, log and skip the for loop
-            print("No IPs provided, skipping broadcast")
-        else:
-            for IP in IPs:
-                bh.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
-                print(f"Sending handshake to {IP}")
-        time.sleep(TIMEOUT)
+    while True:
+        # Broadcasts handshake message to the given IPs
+        with devices_lock:
+            IPs = [device['ip'] for device in found_devices]
+        # bh for broadcast handshake
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bh:
+            bh.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            if not IPs:  # If no IPs are provided, log and skip the for loop
+                print("No IPs provided, skipping broadcast")
+            else:
+                for IP in IPs:
+                    bh.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
+                    print(f"Sending handshake to {IP}")
+            time.sleep(TIMEOUT)
 
 
 def receive_handshake():
@@ -55,7 +56,7 @@ def receive_handshake():
                 if addr[0] == local_ip or addr[0] == BLOCKED_IP or data != HANDSHAKE_MESSAGE:
                     continue
                 print(f"Received handshake from {addr[0]}")
-                broadcast_handshake(addr[0])  # Respond back to the device
+                broadcast_handshake()  # Respond back to the device
                 print(f"Responded to {addr[0]}")
             except socket.timeout:
                 break
