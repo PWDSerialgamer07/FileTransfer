@@ -72,8 +72,8 @@ def receive_discovery():
             dr.bind(('0.0.0.0', DISCOVERY_PORT))
             try:
                 data, addr = dr.recvfrom(1024)
-                print("Receiving discoveries...")
-                if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
+                # This is stupid \/
+                if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP and addr[0] not in [d['ip'] for d in found_devices]:
                     print(f"Found device at {addr[0]}, responding")
                     dr.sendto(DISCOVERY_MESSAGE, (addr[0], DISCOVERY_PORT))
                     with devices_lock:
@@ -81,7 +81,6 @@ def receive_discovery():
                             found_devices.append({'ip': addr[0]})
             except socket.timeout:
                 break
-            time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
 
 def send_discovery():
