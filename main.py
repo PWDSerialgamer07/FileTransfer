@@ -27,8 +27,10 @@ def get_local_ip():
     return local_ip
 
 
-def broadcast_handshake(IPs):
+def broadcast_handshake():
     # Broadcasts handshake message to the given IPs
+    with devices_lock:
+        IPs = [device['ip'] for device in found_devices]
     # bh for broadcast handshake
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bh:
         bh.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -111,12 +113,9 @@ def main():
     # Start the handshake receiving thread
     receive_thread = threading.Thread(target=receive_handshake, daemon=True)
     receive_thread.start()
-    with devices_lock:
-        if found_devices:
-            Ips = found_devices[:]
     # Start the handshake sending thread
     send_thread = threading.Thread(
-        target=broadcast_handshake, daemon=True, args=(Ips,))
+        target=broadcast_handshake, daemon=True)
     send_thread.start()
 
     while True:
