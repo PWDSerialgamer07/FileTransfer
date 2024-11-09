@@ -7,9 +7,10 @@ HANDSHAKE_PORT = 5001
 DISCOVERY_MESSAGE = b'DISCOVERY'
 HANDSHAKE_MESSAGE = b'HANDSHAKE'
 BROADCAST_IP = '192.168.1.255'
-TIMEOUT = 10  # In seconds
+TIMEOUT = 10  # In seconds, also technically both the timeout and the time between handshakes and discoveries
 BLOCKED_IP = "25.34.22.246"
-devices = []
+found_devices = []
+devices_lock = threading.Lock()
 
 
 def get_local_ip():
@@ -26,12 +27,17 @@ def get_local_ip():
     return local_ip
 
 
-def broadcast_handshake(IP=BROADCAST_IP):
-    # Same as before, broadcasts discovery message to the given IP
+def broadcast_handshake(IPs):
+    # Broadcasts handshake message to the given IPs
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
         bs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        bs.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
-        print(f"Sending handshake to {IP}")
+        if not IPs:  # If no IPs are provided, log and skip the for loop
+            print("No IPs provided, skipping broadcast")
+        else:
+            for IP in IPs:
+                bs.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
+                print(f"Sending handshake to {IP}")
+        time.sleep(TIMEOUT)
 
 
 def receive_handshake():
@@ -42,15 +48,11 @@ def receive_handshake():
         while True:
             try:
                 data, addr = bs.recvfrom(1024)
-                if addr[0] == local_ip or addr[0] == BLOCKED_IP or addr[0] in devices:
+                if addr[0] == local_ip or addr[0] == BLOCKED_IP or data != HANDSHAKE_MESSAGE:
                     continue
                 print(f"Received handshake from {addr[0]}")
-                if data != HANDSHAKE_MESSAGE:
-                    continue
-                if addr[0] not in devices and data == HANDSHAKE_MESSAGE:
-                    broadcast_handshake(addr[0])  # Respond back to the device
-                    print(f"Responded to {addr[0]}")
-                    devices.append(addr[0])
+                broadcast_handshake(addr[0])  # Respond back to the device
+                print(f"Responded to {addr[0]}")
             except socket.timeout:
                 break
 
@@ -59,7 +61,6 @@ def discover_devices():
     """ Continuously sends a discovery message and waits for responses. """
     local_ip = get_local_ip()
     while True:
-        found_devices = []
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
             s.bind(('0.0.0.0', DISCOVERY_PORT))
@@ -70,6 +71,7 @@ def discover_devices():
 
             try:
                 data, addr = s.recvfrom(1024)
+                print("Receiving discoveries...")
                 if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
                     print(f"Found device at {addr[0]}, responding")
                     s.sendto(DISCOVERY_MESSAGE, (addr[0], DISCOVERY_PORT))
@@ -80,6 +82,7 @@ def discover_devices():
 
 
 def main():
+    Ips = []
     # Start the discovery thread to continuously send messages
     discover_thread = threading.Thread(target=discover_devices, daemon=True)
     discover_thread.start()
@@ -87,6 +90,13 @@ def main():
     # Start the handshake receiving thread
     receive_thread = threading.Thread(target=receive_handshake, daemon=True)
     receive_thread.start()
+    with devices_lock:
+        if found_devices:
+            Ips = found_devices[:]
+    # Start the handshake sending thread
+    send_thread = threading.Thread(
+        target=broadcast_handshake, daemon=True, args=(Ips,))
+    send_thread.start()
 
     while True:
         # Main loop logic can go here
