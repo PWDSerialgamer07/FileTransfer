@@ -29,13 +29,14 @@ def get_local_ip():
 
 def broadcast_handshake(IPs):
     # Broadcasts handshake message to the given IPs
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
-        bs.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    # bh for broadcast handshake
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bh:
+        bh.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         if not IPs:  # If no IPs are provided, log and skip the for loop
             print("No IPs provided, skipping broadcast")
         else:
             for IP in IPs:
-                bs.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
+                bh.sendto(HANDSHAKE_MESSAGE, (IP, HANDSHAKE_PORT))
                 print(f"Sending handshake to {IP}")
         time.sleep(TIMEOUT)
 
@@ -43,11 +44,12 @@ def broadcast_handshake(IPs):
 def receive_handshake():
     # Handles receiving handshakes
     local_ip = get_local_ip()
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as bs:
-        bs.bind(('0.0.0.0', HANDSHAKE_PORT))
+    # rh for receive handshake
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as rh:
+        rh.bind(('0.0.0.0', HANDSHAKE_PORT))
         while True:
             try:
-                data, addr = bs.recvfrom(1024)
+                data, addr = rh.recvfrom(1024)
                 if addr[0] == local_ip or addr[0] == BLOCKED_IP or data != HANDSHAKE_MESSAGE:
                     continue
                 print(f"Received handshake from {addr[0]}")
@@ -57,35 +59,54 @@ def receive_handshake():
                 break
 
 
-def discover_devices():
-    """ Continuously sends a discovery message and waits for responses. """
+def receive_discovery():
+    """
+    Listens for discovery messages on the network and responds to them.
+    """
     local_ip = get_local_ip()
     while True:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-            s.bind(('0.0.0.0', DISCOVERY_PORT))
-            s.settimeout(TIMEOUT)
-
-            print(f"Sending discovery message from {local_ip}...")
-            s.sendto(DISCOVERY_MESSAGE, ('<broadcast>', DISCOVERY_PORT))
-
+        # ds for discovery receive
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as dr:
+            dr.bind(('0.0.0.0', DISCOVERY_PORT))
             try:
-                data, addr = s.recvfrom(1024)
+                data, addr = dr.recvfrom(1024)
                 print("Receiving discoveries...")
                 if data == DISCOVERY_MESSAGE and addr[0] != local_ip and addr[0] != BLOCKED_IP:
                     print(f"Found device at {addr[0]}, responding")
-                    s.sendto(DISCOVERY_MESSAGE, (addr[0], DISCOVERY_PORT))
-                    found_devices.append({'ip': addr[0]})
+                    dr.sendto(DISCOVERY_MESSAGE, (addr[0], DISCOVERY_PORT))
+                    with devices_lock:
+                        if addr[0] not in [d['ip'] for d in found_devices]:
+                            found_devices.append({'ip': addr[0]})
             except socket.timeout:
                 break
+            time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
+
+
+def send_discovery():
+    """
+    Sends discovery messages over UDP broadcast to find devices on the network.
+    """
+    local_ip = get_local_ip()
+    while True:
+        # ds for discovery sned
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP) as ds:
+            ds.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            ds.settimeout(TIMEOUT)
+
+            print(f"Sending discovery message from {local_ip}...")
+            ds.sendto(DISCOVERY_MESSAGE, ('<broadcast>', DISCOVERY_PORT))
             time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
 
 def main():
     Ips = []
     # Start the discovery thread to continuously send messages
-    discover_thread = threading.Thread(target=discover_devices, daemon=True)
-    discover_thread.start()
+    send_discover_thread = threading.Thread(target=send_discovery, daemon=True)
+    send_discover_thread.start()
+
+    send_receive_thread = threading.Thread(
+        target=receive_discovery, daemon=True)
+    send_receive_thread.start()
 
     # Start the handshake receiving thread
     receive_thread = threading.Thread(target=receive_handshake, daemon=True)
