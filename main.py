@@ -5,10 +5,10 @@ import subprocess
 from tkinter import Tk, filedialog
 import tqdm
 import os
-from rich.table import Table
-from rich.layout import Layout
-from rich.live import Live
-from rich.console import Console
+from textual.app import App, ComposeResult
+from textual.containers import ScrollableContainer
+from textual.widgets import Button, Footer, Header, Static
+
 
 DISCOVERY_PORT = 5000
 HANDSHAKE_PORT = 5001
@@ -19,8 +19,6 @@ TIMEOUT = 10  # In seconds, also technically both the timeout and the time betwe
 BLOCKED_IP = "25.34.22.246"
 found_devices = []
 devices_lock = threading.Lock()
-layout = Layout
-console = Console()
 
 
 def get_local_ip():
@@ -127,110 +125,28 @@ def send_discovery():
             time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
 
-def print_found_devices():
-    with Live(device_discovery_layout(), console=console, refresh_per_second=4) as live:
-        while True:
-            with devices_lock:
-                live.update(device_discovery_layout())
-            # Delay between updates to keep the display responsive
-            time.sleep(2)
+class Ips_returned(Static):
+    def compose(self) -> ComposeResult:
+        yield Static("Ips returned:", classes="box", id="ips_returned")
 
 
-def get_user_input():
-    selected_ip = None
-    while selected_ip is None:
-        user_input = input("Enter the device index: ").strip()
-        with devices_lock:
-            try:
-                # Try to find the device by index
-                index = int(user_input)
-                selected_device = next(
-                    device for device in found_devices if device['index'] == index)
-                selected_ip = selected_device['ip']
-            except (ValueError, StopIteration):
-                print("Invalid index. Please try again.")
-
-    print(f"Selected device IP: {selected_ip}")
-    # After device selection, continue with other logic (e.g., file transfer, etc.)
-    # start_file_transfer(selected_ip)
+class Console(Static):
+    def compose(self) -> ComposeResult:
+        yield Static("Console:", classes="box", id="console")
 
 
-def toggler_layout():
-    """
-    Toggles between the device discovery layout and the file transfer layout
-    once the user selects a device IP.
-    """
-    selected_ip = None  # Initially, no IP is selected
-    # TODO Do this later, I have no idea how to do it
+class User_ip_input(Static):
+    def compose(self) -> ComposeResult:
+        yield Static("Enter your choice:", classes="box", id="user_ip_input")
 
 
-def device_discovery_layout():
-    """Creates a layout for displaying found devices."""
-    layout.split_column(
-        Layout(name="header"),
-        Layout(name="body", ratio=3),
-        Layout(name="footer")
-    )
+class Discovery(App):
+    CSS_PATH = "Tcss/grid_layout.tcss"
 
-    # Header
-    layout["header"].update(Table(title="Device Discovery"))
-
-    # Body
-    table = Table(title="Found Devices")
-    table.add_column("Index", justify="center")
-    table.add_column("IP Address", justify="center")
-    with devices_lock:
-        for device in found_devices:
-            table.add_row(str(device['index']), device['ip'])
-    layout["body"].update(table)
-
-    # Footer
-    layout["footer"].update("Press Enter after entering index.")
-
-    return layout
-
-
-def file_transfer_layout(selected_ip):
-    """Creates a layout for file transfer."""
-    layout = Layout()
-    layout.split_column(
-        Layout(name="header"),
-        Layout(name="body", ratio=3),
-        Layout(name="footer")
-    )
-
-    # Header
-    layout["header"].update(f"File Transfer with {selected_ip}")
-
-    # Body (for file transfer progress or options)
-    layout["body"].update(
-        "File transfer details and progress will appear here.")
-
-    # Footer
-    layout["footer"].update("Press 'q' to quit file transfer.")
-
-    return layout
-
-
-def get_user_IP_input():
-    """
-    Ask the user to select a device index and return the corresponding IP.
-    """
-    selected_ip = None
-    while selected_ip is None:
-        user_input = input("Enter the device index: ").strip()
-        with devices_lock:
-            try:
-                # Try to find the device by index
-                index = int(user_input)
-                selected_device = next(
-                    device for device in found_devices if device['index'] == index)
-                selected_ip = selected_device['ip']
-            except (ValueError, StopIteration):
-                print("Invalid index. Please try again.")
-
-    print(f"Selected device IP: {selected_ip}")
-    return selected_ip
+    def compose(self) -> ComposeResult:
+        yield Ips_returned()
+        yield Console()
+        yield User_ip_input()
 
 
 def main():
@@ -245,17 +161,7 @@ def main():
     # Allow some time for devices to be discovered
     time.sleep(10)  # Adjust this depending on how long discovery takes
 
-    # Start the display thread (handles device list UI updates)
-    display_thread = threading.Thread(target=print_found_devices, daemon=True)
-    display_thread.start()
-
-    # Start the user input thread (handles device selection)
-    input_thread = threading.Thread(target=get_user_input, daemon=True)
-    input_thread.start()
-
-    # Wait for the input thread to finish (this keeps the program running)
-    input_thread.join()
-
 
 if __name__ == "__main__":
-    main()
+    app = Discovery()
+    app.run()

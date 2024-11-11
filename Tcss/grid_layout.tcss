@@ -1,0 +1,14 @@
+Screen {
+    layout: grid;
+    grid-size: 2 2;
+}
+
+.box {
+    height: 100%;
+    border: solid green;
+}
+
+#console {
+    column-span: 1;
+    row-span: 2;
+}
