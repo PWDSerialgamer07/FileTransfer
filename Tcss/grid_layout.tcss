@@ -1,6 +1,6 @@
 Screen {
     layout: grid;
-    grid-size: 2 2;
+    grid-size: 2 9;
 }
 
 .box {
@@ -10,5 +10,18 @@ Screen {
 
 #console {
     column-span: 1;
-    row-span: 2;
+    row-span: 9;
+}
+VerticalScroll {
+    border: solid green;
+}
+
+#ips_returned {
+    column-span: 1;
+    row-span: 8;
+}
+
+#user_ip_input {
+    row-span: 1;
+    
 }
