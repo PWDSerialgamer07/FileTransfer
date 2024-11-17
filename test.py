@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Static, Input, Label
+from textual.widgets import Static, Input, Label, Log
 from textual.containers import Center, VerticalScroll
 ip = None
 
@@ -9,21 +9,22 @@ class Discovery(App):
 
     def compose(self) -> ComposeResult:
         yield VerticalScroll(id="ips_returned")
-        yield VerticalScroll(id="console")
+        yield Log(id="console")
         yield Input(placeholder="Enter your choice", id="user_ip_input", type="integer")
 
     def on_input_submitted(self) -> None:
         self.choose_ip()
 
     def choose_ip(self) -> None:
+        log = self.query_one("#console")
         text_value = self.query_one(Input).value
         try:
             value = int(text_value)
         except ValueError:
-            self.query_one("#console").mount(Label("Invalid input"))
+            log.write_line("Invalid input")
             self.query_one("#user_ip_input").value = ""
             return
-        self.query_one("#console").mount(Label(f"{value} has been chosen"))
+        log.write_line(f"{value} has been chosen")
         self.query_one("#user_ip_input").value = ""
 
 
