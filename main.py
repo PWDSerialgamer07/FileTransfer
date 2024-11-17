@@ -138,8 +138,27 @@ class Discovery(App):
 
     def on_ready(self) -> None:
         log = self.query_one("#console")
+        send_discover_thread = threading.Thread(
+            target=send_discovery, daemon=True, args=(log,))
+        send_discover_thread.start()
 
-    def choose_ip(self) -> None:
+        receive_discover_thread = threading.Thread(
+            target=receive_discovery, daemon=True, args=(log,))
+        receive_discover_thread.start()
+
+        # Can be adjusted, it's just so handshakes don't start without having IPs
+        # time.sleep(10)
+        # Start the handshake receiving thread
+        receive_thread = threading.Thread(
+            target=receive_handshake, daemon=True, args=(log,))
+        receive_thread.start()
+        # Start the handshake sending thread
+        send_thread = threading.Thread(
+            target=broadcast_handshake, daemon=True, args=(log,))
+        send_thread.start()
+
+    def choose_ip(self) -> None:  # I'll do this later
+        return
         text_value = self.query_one(Input).value
         try:
             value = int(text_value)
