@@ -16,7 +16,8 @@ DISCOVERY_MESSAGE = b'DISCOVERY'
 HANDSHAKE_MESSAGE = b'HANDSHAKE'
 BROADCAST_IP = '192.168.1.255'
 TIMEOUT = 10  # In seconds, also technically both the timeout and the time between handshakes and discoveries
-BLOCKED_IP = "25.34.22.246"
+BLOCKED_IP = "25.34.22.246" # Really don't know what this IP is for so I'm just manually disabling it.
+SERVER_DATA_PATH = "server_data" # Where received data is saved
 found_devices = []
 devices_lock = threading.Lock()
 
@@ -124,6 +125,19 @@ def send_discovery(log):
             ds.sendto(DISCOVERY_MESSAGE, ('<broadcast>', DISCOVERY_PORT))
             time.sleep(TIMEOUT)  # Changed this one to the TIMEOUT value
 
+def TCP_server(log):
+    IP = get_local_ip()
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Listen for TCP connections
+    server.bind(IP)
+    server.listen()
+    log.write_line("Started listening for TCP connections")
+    while True:
+        conn, addr = server.accept()
+        client_handling_thread = threading.Thread(target=handle_client, args = (conn, addr)) # TODO make handle_client
+        client_handling_thread.start()
+
+def handle_client(conn, addr):
+    
 
 class Discovery(App):
     CSS_PATH = "Tcss/grid_layout.tcss"
