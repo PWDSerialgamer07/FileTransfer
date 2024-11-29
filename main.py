@@ -12,12 +12,14 @@ from textual.containers import Center, VerticalScroll
 
 DISCOVERY_PORT = 5000
 HANDSHAKE_PORT = 5001
+TRANSFER_PORT = 5002
 DISCOVERY_MESSAGE = b'DISCOVERY'
 HANDSHAKE_MESSAGE = b'HANDSHAKE'
 BROADCAST_IP = '192.168.1.255'
 TIMEOUT = 10  # In seconds, also technically both the timeout and the time between handshakes and discoveries
 BLOCKED_IP = "25.34.22.246" # Really don't know what this IP is for so I'm just manually disabling it.
 SERVER_DATA_PATH = "server_data" # Where received data is saved
+SIZE = 1024
 found_devices = []
 devices_lock = threading.Lock()
 
@@ -128,15 +130,54 @@ def send_discovery(log):
 def TCP_server(log):
     IP = get_local_ip()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # Listen for TCP connections
-    server.bind(IP)
+    ADDR = (IP, TRANSFER_PORT)
+    server.bind(ADDR)
     server.listen()
     log.write_line("Started listening for TCP connections")
     while True:
         conn, addr = server.accept()
-        client_handling_thread = threading.Thread(target=handle_client, args = (conn, addr)) # TODO make handle_client
+        client_handling_thread = threading.Thread(target=handle_client, args = (conn, addr, log, server)) # TODO make handle_client
         client_handling_thread.start()
 
-def handle_client(conn, addr):
+def handle_client(conn, addr, log, server):
+    data = conn.recv(SIZE).decode("utf-8")
+    item = data.split("_") # This is mostly copied from the internet until I have a somewhat better understanding of this, and networking in general
+    FILENAME = os.path.join(SERVER_DATA_PATH,item[0])
+    FILESIZE = int(item[1])
+    bar = tqdm(range(FILESIZE), f"Receiving {FILENAME}", unit="B", unit_scale=True, unit_divisor=SIZE) # progress bar
+    with open(FILENAME,"w") as w:
+        while True:
+            data = conn.recv(SIZE).decode("utf-8")
+            if not data:
+                break
+            w.write(data)
+            bar.update(len(data))
+    conn.send("Transfer completed.".encode("utf-8"))
+    conn.close()
+    server.close
+    log.write_line("Transfer completed")
+
+def TCP_client(log, IP):
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    ADDR = (IP, TRANSFER_PORT)
+    client.connect(ADDR)
+    file = filedialog.askopenfilename(master=None) # Get the user to choose a file to transfer
+    size = os.stat(file).st_size # For some reason os.path.getsize didn't work, so I'm using this instead
+    name = file.split("/").pop() # Separate the path using / and returns the filename only, god damn annoying Windows which accepts both / and \
+    data = f"{name}_{size}"
+    client.send(data.encode("utf-8")) # Send the name of the file and its size
+    bar = tqdm(range(size), f"Sending {file}", unit="B", unit_scale=True, unit_divisor=SIZE) # Progress bar
+    with open(file,"r") as r:
+        while True:
+            data = r.read(SIZE)
+            if not data:
+                break
+            client.send(data.encode('utf-8'))
+            bar.update(len(data))
+    msg = client.recv(SIZE).decode('utf-8')
+    log.write_line(msg)
+    client.close
+
     
 
 class Discovery(App):
