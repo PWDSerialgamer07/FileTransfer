@@ -26,6 +26,7 @@ class Discovery(App):
             return
         log.write_line(f"{value} has been chosen")
         self.query_one("#user_ip_input").value = ""
+        self.query_one("#ips_returned").write_line(f"{value}")
 
 
         # Save this script as discovery_app.py and ensure your CSS file is correctly placed in the Tcss folder.

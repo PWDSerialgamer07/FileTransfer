@@ -1,0 +1,9 @@
+{
+	"Discovery_port": "5000",
+	"Handshake_port": "5001",
+	"Transfer_port": "5002",
+	"Discovery_msg": "DISCOVERY",
+	"Hanshake_msg": "HANSHAKE",
+	"Broadcast_Ip": "192.168.1.255",
+	"Timeout": "10"
+}

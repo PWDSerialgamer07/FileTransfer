@@ -213,7 +213,6 @@ class Discovery(App):
         send_thread.start()
 
     def choose_ip(self) -> None:  # I'll do this later
-        return
         text_value = self.query_one(Input).value
         try:
             value = int(text_value)
